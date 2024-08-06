@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useForm, SubmitHandler } from "react-hook-form";
@@ -11,12 +12,36 @@ import * as z from "zod";
 import type { Database } from "@/lib/database.types";
 type Schema = z.infer<typeof schema>
 
+// Supabaseクライアントの初期化
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 //入力データの検証ルールを定義
 const schema = z.object({
     name: z.string().min(2, {message: "2文字以上入力する必要があります"}),
     email: z.string().email({ message: "メールアドレスの形式ではありません"}),
     password: z.string().min(6, {message: "6文字以上入力してください"}),
 })
+
+// サインアップリクエストをリトライする関数
+const retrySignUp = async (supabase, data, retries = 5) => {
+    let delay = 1000; // 初期リトライ間隔: 1秒
+
+    for (let i = 0; i < retries; i++) {
+        const { error: errorSignup } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+                emailRedirectTo: `${location.origin}/auth/callback`, // 修正箇所
+            },
+        });
+        if (!errorSignup) return null;
+        if (errorSignup.status !== 429 || i === retries - 1) return errorSignup;
+        await new Promise(resolve => setTimeout(resolve, delay)); // リトライ前に待機
+        delay *= 2; // リトライ間隔を指数的に増加
+    }
+};
 
 //サインアップページ
 const Signup = () => {
@@ -32,7 +57,7 @@ const Signup = () => {
         reset
     } = useForm({
         //初期値
-        defaultValues: {email: "", password: "" },
+        defaultValues: {name: "",email: "", password: "" },
         resolver: zodResolver(schema),
     })
 
@@ -46,7 +71,7 @@ const Signup = () => {
                 email: data.email,
                 password: data.password,
                 options: {
-                    emailRedirectTo: "${location.origin}/autth/callback",
+                    emailRedirectTo: "${location.origin}/auth/callback",
                 }
             })
 

@@ -22,7 +22,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
 
           <footer className="py-5">
             <div className="text-center text-sm">
-              Copyright © All rights reserved | Paw Jounrney
+              Copyright © All rights reserved | もじりや不動産開発
             </div>
           </footer>
         </div>
